@@ -176,6 +176,7 @@ class StubGen:
         private_exceptions: set[str] = set(),
         include_internal_imports: bool = True,
         include_external_imports: bool = False,
+        private_submodule: Optional[str] = None,
         max_expr_length: int = 50,
         patterns: List[ReplacePattern] = [],
         quiet: bool = True,
@@ -201,6 +202,9 @@ class StubGen:
 
         # Include types and functions imported from external packages?
         self.include_external_imports = include_external_imports
+
+        # Name of private submodule, if any.
+        self.private_submodule = private_submodule
 
         # Maximal length (in characters) before an expression gets abbreviated as '...'
         self.max_expr_length = max_expr_length
@@ -380,6 +384,12 @@ class StubGen:
                 self.write_ln(f"@{overload}")
                 self.put_nb_overload(fn, s, name)
 
+    def public_module_name(self, name: str):
+        if self.private_submodule is None:
+            return name
+        else:
+            return re.sub(f".{self.private_submodule}", "", name)
+
     def put_function(self, fn: Callable[..., Any], name: Optional[str] = None, parent: Optional[object] = None):
         """Append a function of an arbitrary type to the stub"""
         # Don't generate a constructor for nanobind classes that aren't constructible
@@ -390,7 +400,7 @@ class StubGen:
         fn_name = getattr(fn, "__name__", None)
 
         # Check if this function is an alias from *another* module
-        if name and fn_module and fn_module != self.module.__name__:
+        if name and fn_module and self.public_module_name(fn_module) != self.public_module_name(self.module.__name__):
             self.put_value(fn, name)
             return
 
